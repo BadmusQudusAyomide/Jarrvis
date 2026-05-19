@@ -32,13 +32,16 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # --- Backend URLs ---
-API_URL = "http://127.0.0.1:8080/chat"
-CLEAR_URL = "http://127.0.0.1:8080/chat/clear"
-DOWNLOAD_URL = "http://127.0.0.1:8080/tools/download_media"
-PROFILE_GET_URL = "http://127.0.0.1:8080/profile/get"
-PROFILE_UPDATE_URL = "http://127.0.0.1:8080/profile/update"
-PROFILE_REMEMBER_URL = "http://127.0.0.1:8080/profile/remember"
-PROFILE_FORGET_URL = "http://127.0.0.1:8080/profile/forget"
+# On Render the FastAPI server runs on $PORT (default 10000); locally it's 8080.
+_PORT = os.getenv("PORT", "8080")
+_BASE = f"http://127.0.0.1:{_PORT}"
+API_URL              = f"{_BASE}/chat"
+CLEAR_URL            = f"{_BASE}/chat/clear"
+DOWNLOAD_URL         = f"{_BASE}/tools/download_media"
+PROFILE_GET_URL      = f"{_BASE}/profile/get"
+PROFILE_UPDATE_URL   = f"{_BASE}/profile/update"
+PROFILE_REMEMBER_URL = f"{_BASE}/profile/remember"
+PROFILE_FORGET_URL   = f"{_BASE}/profile/forget"
 
 # Security: restrict to owner if set
 OWNER_TELEGRAM_ID = int(os.getenv("OWNER_TELEGRAM_ID", "0"))
