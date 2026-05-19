@@ -11,8 +11,9 @@ SCOPES = [
     'https://www.googleapis.com/auth/gmail.modify'
 ]
 
-CREDENTIALS_FILE = r'C:\Users\HP\Documents\Jarvis\credentials.json'
-TOKEN_FILE = r'C:\Users\HP\Documents\Jarvis\token.pickle'
+_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+CREDENTIALS_FILE = os.path.join(_ROOT, 'credentials.json')
+TOKEN_FILE = os.path.join(_ROOT, 'token.pickle')
 
 def get_google_credentials():
     """Get Google OAuth2 credentials for Calendar and Gmail access.
