@@ -17,34 +17,40 @@ TOKEN_FILE = os.path.join(_ROOT, 'token.pickle')
 
 def get_google_credentials():
     """Get Google OAuth2 credentials for Calendar and Gmail access.
-    
-    Returns:
-        Credentials: Authenticated Google credentials object
-        
-        
-    Process:
-    1. First run - opens browser for OAuth2 consent
-    2. Subsequent runs - loads token from file, refreshes if expired
+
+    On a hosted server (Render etc.) set GOOGLE_TOKEN_B64 env var to the
+    base64-encoded contents of token.pickle — generated locally after first auth.
     """
     creds = None
-    
-    # Load existing credentials from token file
-    if os.path.exists(TOKEN_FILE):
+
+    # Hosted path: load token from base64 env var (no filesystem write needed)
+    token_b64 = os.getenv("GOOGLE_TOKEN_B64", "").strip()
+    if token_b64:
+        import base64, io
+        creds = pickle.load(io.BytesIO(base64.b64decode(token_b64)))
+
+    # Local path: load from file
+    elif os.path.exists(TOKEN_FILE):
         with open(TOKEN_FILE, 'rb') as f:
             creds = pickle.load(f)
-    
-    # If credentials are invalid or missing, get new ones
+
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            # Refresh expired credentials
             creds.refresh(Request())
         else:
-            # Run OAuth2 flow for new credentials
+            if not os.path.exists(CREDENTIALS_FILE):
+                raise FileNotFoundError(
+                    "credentials.json not found. Add it as a Secret File on Render "
+                    "or run the OAuth flow locally first."
+                )
             flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
             creds = flow.run_local_server(port=0)
-        
-        # Save credentials for future use
-        with open(TOKEN_FILE, 'wb') as f:
-            pickle.dump(creds, f)
-    
+
+        # Save locally if possible (won't work on ephemeral servers but that's fine)
+        try:
+            with open(TOKEN_FILE, 'wb') as f:
+                pickle.dump(creds, f)
+        except OSError:
+            pass
+
     return creds
