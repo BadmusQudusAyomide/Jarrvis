@@ -2,12 +2,17 @@
 .env
 token.pickle
 *.pickle
+credentials.json
 
 # Binaries / installers
 *.exe
 *.msi
 *.7z
 *.zip
+
+# Screenshots / images at root
+screenshot.png
+*.png
 
 # Python
 __pycache__/
