@@ -23,15 +23,34 @@ logger = logging.getLogger(__name__)
 
 
 def _start_telegram_bot() -> None:
-    """Run the Telegram bot in a background daemon thread (has its own event loop)."""
+    """Run the Telegram bot in a background daemon thread with its own event loop.
+
+    Uses the async context manager instead of run_polling() so signal handlers
+    are never registered — required when running outside the main thread.
+    """
     token = os.getenv("TELEGRAM_BOT_TOKEN", "")
     if not token or token == "your_telegram_bot_token_here":
         logger.warning("TELEGRAM_BOT_TOKEN not set — Telegram bot will not start.")
         return
+
+    import asyncio
+    from telegram import Update
+
     try:
-        from interfaces.telegram.bot import main as bot_main
+        from interfaces.telegram.bot import build_application
+        application = build_application()
         logger.info("Starting Telegram bot...")
-        bot_main()
+
+        async def _run():
+            async with application:
+                await application.start()
+                await application.updater.start_polling(allowed_updates=Update.ALL_TYPES)
+                # Keep running until the thread is killed (daemon)
+                await asyncio.Event().wait()
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(_run())
     except Exception as e:
         logger.error(f"Telegram bot crashed: {e}", exc_info=True)
 

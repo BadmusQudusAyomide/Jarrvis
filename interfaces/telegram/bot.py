@@ -742,15 +742,14 @@ async def post_init(application: Application) -> None:
 # Main
 # ---------------------------------------------------------------------------
 
-def main() -> None:
+def build_application():
+    """Build and return the configured Application (without starting it)."""
     token = os.getenv("TELEGRAM_BOT_TOKEN")
     if not token or token == "your_telegram_bot_token_here":
-        print("Error: TELEGRAM_BOT_TOKEN not set in .env")
-        sys.exit(1)
+        raise ValueError("TELEGRAM_BOT_TOKEN not set")
 
     application = Application.builder().token(token).post_init(post_init).build()
 
-    # Guided setup conversation (must be registered before generic MessageHandler)
     setup_conv = ConversationHandler(
         entry_points=[CommandHandler("setup", setup_start)],
         states={
@@ -767,7 +766,6 @@ def main() -> None:
     )
     application.add_handler(setup_conv)
 
-    # Standard commands
     application.add_handler(CommandHandler("start",     start_command))
     application.add_handler(CommandHandler("help",      help_command))
     application.add_handler(CommandHandler("clear",     clear_command))
@@ -781,16 +779,19 @@ def main() -> None:
     application.add_handler(CommandHandler("reminders", reminders_command))
     application.add_handler(CommandHandler("briefing",  briefing_command))
 
-    # Message handlers
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_handler(MessageHandler(filters.VOICE,        handle_voice))
     application.add_handler(MessageHandler(filters.PHOTO,        handle_photo))
     application.add_handler(MessageHandler(filters.Document.ALL, handle_document))
 
     application.add_error_handler(error_handler)
+    return application
 
+
+def main() -> None:
+    """Entry point when running the bot standalone (development)."""
     logger.info("Jarvis Telegram Bot starting...")
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    build_application().run_polling(allowed_updates=Update.ALL_TYPES)
 
 
 if __name__ == "__main__":
