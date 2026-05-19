@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+requests
+python-dotenv
+psutil
+tavily-python
+chromadb
+playwright
+plyer
+pyperclip
+Pillow
+python-telegram-bot[job-queue]>=21.0
+tweepy>=4.14.0
+yt-dlp
+pypdf

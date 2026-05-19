@@ -1,0 +1,32 @@
+{
+  "productName": "Jarvis AI",
+  "version": "0.1.0",
+  "identifier": "com.jarvis.app",
+  "build": {
+    "beforeDevCommand": "npm run dev --prefix ../../frontend",
+    "beforeBuildCommand": "npm run build --prefix ../../frontend",
+    "devUrl": "http://localhost:3000",
+    "frontendDist": "../static/frontend"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Jarvis AI",
+        "width": 1200,
+        "height": 800,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true,
+        "decorations": true,
+        "transparent": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "msi"
+  }
+}

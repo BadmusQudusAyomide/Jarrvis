@@ -1,0 +1,52 @@
+# Secrets — never commit
+.env
+token.pickle
+*.pickle
+
+# Binaries / installers
+*.exe
+*.msi
+*.7z
+*.zip
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Data (ephemeral / user-specific)
+data/
+downloads/
+workspace/
+chroma_db/
+*.db
+
+# Node
+node_modules/
+frontend/dist/
+static/frontend/
+
+# Rust / Tauri build output
+target/
+interfaces/desktop/target/
+interfaces/desktop/node_modules/
+interfaces/desktop/mingw.7z
+interfaces/desktop/*.7z
+interfaces/desktop/*.zip
+Cargo.lock
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
