@@ -25,7 +25,9 @@ GROQ_MODEL_CODING = os.getenv("GROQ_MODEL_CODING", "qwen-qwq-32b").strip()
 
 def _chat_with_groq(messages: list, api_key: str = None, model: str = None) -> str:
     """Chat request against Groq OpenAI-compatible API.
-    Pass api_key/model explicitly to use a different account or model.
+
+    On 429 (rate limit): waits the Retry-After seconds (capped at 30s) then
+    retries once on the same account, then tries the other account as fallback.
     """
     key = api_key or GROQ_API_KEY
     chosen_model = model or GROQ_MODEL
@@ -34,18 +36,49 @@ def _chat_with_groq(messages: list, api_key: str = None, model: str = None) -> s
         return "Error: GROQ_API_KEY is not set"
 
     url = f"{GROQ_BASE_URL}/chat/completions"
-    headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
     payload = {"model": chosen_model, "messages": messages, "stream": False}
 
-    try:
-        res = requests.post(url, json=payload, headers=headers, timeout=GROQ_TIMEOUT)
-        if res.status_code != 200:
-            return f"Error talking to Groq: HTTP {res.status_code}"
+    def _post(k: str, m: str) -> requests.Response:
+        headers = {"Authorization": f"Bearer {k}", "Content-Type": "application/json"}
+        p = {**payload, "model": m}
+        return requests.post(url, json=p, headers=headers, timeout=GROQ_TIMEOUT)
+
+    def _extract(res: requests.Response) -> str:
         return (
             res.json().get("choices", [{}])[0]
             .get("message", {})
             .get("content", "")
         )
+
+    try:
+        res = _post(key, chosen_model)
+
+        if res.status_code == 200:
+            return _extract(res)
+
+        if res.status_code == 429:
+            # Respect Retry-After header, wait, then retry on same account
+            retry_after = int(res.headers.get("Retry-After", 5))
+            wait = min(retry_after, 30)
+            logger.warning(f"Groq 429 rate limit — waiting {wait}s then retrying...")
+            time.sleep(wait)
+            res = _post(key, chosen_model)
+            if res.status_code == 200:
+                return _extract(res)
+
+            # Still rate-limited — try the other account
+            other_key = GROQ_API_KEY_CODING if key == GROQ_API_KEY else GROQ_API_KEY
+            other_model = GROQ_MODEL_CODING if key == GROQ_API_KEY else GROQ_MODEL
+            if other_key and other_key != key:
+                logger.warning("Still rate-limited — switching to other Groq account...")
+                res = _post(other_key, other_model)
+                if res.status_code == 200:
+                    return _extract(res)
+
+            return "I'm getting too many requests right now — please try again in a moment."
+
+        return f"Error talking to Groq: HTTP {res.status_code}"
+
     except Exception as e:
         return f"Error talking to Groq: {str(e)}"
 

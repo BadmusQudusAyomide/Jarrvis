@@ -7,6 +7,7 @@ import logging
 import re
 import json
 import ast
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,77 @@ class Agent:
             return "I'm doing well, thank you for asking! How can I help you today?"
         if "who are you" in compact:
             return "I am Jarvis, your personal AI assistant. I can help with coding, tasks, tools, and everyday questions."
+
+        # Date difference: "how many days from X to Y" / "X to Y how many days"
+        date_diff = self._try_date_diff(user_message)
+        if date_diff:
+            return date_diff
+
+        return None
+
+    _MONTHS = {
+        "jan": 1, "january": 1, "feb": 2, "february": 2, "mar": 3, "march": 3,
+        "apr": 4, "april": 4, "may": 5, "jun": 6, "june": 6,
+        "jul": 7, "july": 7, "aug": 8, "august": 8, "sep": 9, "september": 9,
+        "oct": 10, "october": 10, "nov": 11, "november": 11, "dec": 12, "december": 12,
+    }
+
+    def _try_date_diff(self, text: str):
+        """Return day-count answer if message asks how many days between two dates."""
+        lower = text.lower()
+        if not any(w in lower for w in ["how many day", "days is", "days from", "days between", "days since"]):
+            return None
+
+        # Find all date-like tokens: "march 11", "march 11 2026", "11/03", "2026-03-11"
+        pattern = (
+            r"(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?"   # 11/03 or 11/03/2026
+            r"|(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})"           # 2026-03-11
+            r"|(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|"
+            r"jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)"
+            r"\s+(\d{1,2})(?:\s+(\d{2,4}))?"                     # march 11 2026
+            r"|(\d{1,2})\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|"
+            r"jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)"
+            r"(?:\s+(\d{2,4}))?"                                  # 11 march 2026
+        )
+        dates = []
+        now = datetime.now()
+        for m in re.finditer(pattern, lower):
+            g = m.groups()
+            try:
+                if g[0]:   # dd/mm or dd/mm/yyyy
+                    d, mo = int(g[0]), int(g[1])
+                    yr = int(g[2]) if g[2] else now.year
+                    yr = yr + 2000 if yr < 100 else yr
+                    dates.append(datetime(yr, mo, d))
+                elif g[3]: # yyyy-mm-dd
+                    dates.append(datetime(int(g[3]), int(g[4]), int(g[5])))
+                elif g[6]: # month day [year]
+                    mo = self._MONTHS.get(g[6][:3])
+                    if mo:
+                        d = int(g[7])
+                        yr = int(g[8]) if g[8] else now.year
+                        yr = yr + 2000 if yr < 100 else yr
+                        dates.append(datetime(yr, mo, d))
+                elif g[9]: # day month [year]
+                    mo = self._MONTHS.get(g[10][:3])
+                    if mo:
+                        d = int(g[9])
+                        yr = int(g[11]) if g[11] else now.year
+                        yr = yr + 2000 if yr < 100 else yr
+                        dates.append(datetime(yr, mo, d))
+            except (ValueError, TypeError):
+                continue
+
+        # Replace "today" with today's date
+        if "today" in lower:
+            dates.append(now.replace(hour=0, minute=0, second=0, microsecond=0))
+
+        if len(dates) >= 2:
+            delta = abs((dates[1] - dates[0]).days)
+            d1 = dates[0].strftime("%B %d, %Y")
+            d2 = dates[1].strftime("%B %d, %Y")
+            return f"From {d1} to {d2} is **{delta} days**."
+
         return None
 
     def _extract_tool_call_from_text(self, text: str):
