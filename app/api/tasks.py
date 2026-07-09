@@ -5,9 +5,12 @@ from typing import Optional
 import logging
 
 from app.utils.task_queue import task_queue
+from app.agents.planning import Plan, run_planned_task
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+task_queue.register_handler("planned_agent", run_planned_task)
 
 
 class TaskSubmitRequest(BaseModel):
@@ -44,6 +47,13 @@ async def get_task_status(task_id: str):
     
     if not status:
         return {"error": "Task not found"}
+
+    if status.get("task_type") == "planned_agent":
+        plan = Plan.load(task_id)
+        if plan:
+            status["plan"] = plan.to_dict()
+            status["progress"] = plan.progress()
+            status["steps"] = plan.to_dict().get("steps", [])
     
     return status
 

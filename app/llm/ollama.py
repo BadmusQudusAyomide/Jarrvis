@@ -1,20 +1,18 @@
+"""Groq chat client. Historically wrapped a local Ollama server too — that's
+gone now, this module only talks to Groq's OpenAI-compatible API."""
 import requests
 import time
 import logging
 import os
 from dotenv import load_dotenv
-from app.config import OLLAMA_URL, DEFAULT_MODEL, SYSTEM_PROMPT
+from app.config import DEFAULT_MODEL, SYSTEM_PROMPT
 
-load_dotenv()  # ensure .env is loaded before reading OLLAMA_TIMEOUT
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-MAX_RETRIES = 3
-RETRY_DELAY = 2  # seconds
-TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "60"))  # seconds — override with OLLAMA_TIMEOUT in .env
-
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
-GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant").strip()
+GROQ_MODEL = os.getenv("GROQ_MODEL", DEFAULT_MODEL).strip()
 GROQ_BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1").rstrip("/")
 GROQ_TIMEOUT = int(os.getenv("GROQ_TIMEOUT", "60"))
 
@@ -23,8 +21,18 @@ GROQ_API_KEY_CODING = os.getenv("GROQ_API_KEY_CODING", "").strip() or GROQ_API_K
 GROQ_MODEL_CODING = os.getenv("GROQ_MODEL_CODING", "qwen-qwq-32b").strip()
 
 
-def _chat_with_groq(messages: list, api_key: str = None, model: str = None) -> str:
-    """Chat request against Groq OpenAI-compatible API.
+def _post_groq(messages: list, api_key: str, model: str, tools: list = None, tool_choice: str = None) -> requests.Response:
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    payload = {"model": model, "messages": messages, "stream": False}
+    if tools:
+        payload["tools"] = tools
+        payload["tool_choice"] = tool_choice or "auto"
+    return requests.post(f"{GROQ_BASE_URL}/chat/completions", json=payload, headers=headers, timeout=GROQ_TIMEOUT)
+
+
+def _chat_with_groq_raw(messages: list, api_key: str = None, model: str = None, tools: list = None) -> dict:
+    """Chat request against Groq. Returns the raw `message` object from the API
+    (has `content` and, if tools were passed and used, `tool_calls`).
 
     On 429 (rate limit): waits the Retry-After seconds (capped at 30s) then
     retries once on the same account, then tries the other account as fallback.
@@ -33,243 +41,87 @@ def _chat_with_groq(messages: list, api_key: str = None, model: str = None) -> s
     chosen_model = model or GROQ_MODEL
 
     if not key:
-        return "Error: GROQ_API_KEY is not set"
+        return {"content": "Error: GROQ_API_KEY is not set"}
 
-    url = f"{GROQ_BASE_URL}/chat/completions"
-    payload = {"model": chosen_model, "messages": messages, "stream": False}
-
-    def _post(k: str, m: str) -> requests.Response:
-        headers = {"Authorization": f"Bearer {k}", "Content-Type": "application/json"}
-        p = {**payload, "model": m}
-        return requests.post(url, json=p, headers=headers, timeout=GROQ_TIMEOUT)
-
-    def _extract(res: requests.Response) -> str:
-        return (
-            res.json().get("choices", [{}])[0]
-            .get("message", {})
-            .get("content", "")
-        )
+    def _extract(res: requests.Response) -> dict:
+        return res.json().get("choices", [{}])[0].get("message", {"content": ""})
 
     try:
-        res = _post(key, chosen_model)
+        res = _post_groq(messages, key, chosen_model, tools)
 
         if res.status_code == 200:
             return _extract(res)
 
         if res.status_code == 429:
-            # Respect Retry-After header, wait, then retry on same account
             retry_after = int(res.headers.get("Retry-After", 5))
             wait = min(retry_after, 30)
             logger.warning(f"Groq 429 rate limit — waiting {wait}s then retrying...")
             time.sleep(wait)
-            res = _post(key, chosen_model)
+            res = _post_groq(messages, key, chosen_model, tools)
             if res.status_code == 200:
                 return _extract(res)
 
-            # Still rate-limited — try the other account
             other_key = GROQ_API_KEY_CODING if key == GROQ_API_KEY else GROQ_API_KEY
             other_model = GROQ_MODEL_CODING if key == GROQ_API_KEY else GROQ_MODEL
             if other_key and other_key != key:
                 logger.warning("Still rate-limited — switching to other Groq account...")
-                res = _post(other_key, other_model)
+                res = _post_groq(messages, other_key, other_model, tools)
                 if res.status_code == 200:
                     return _extract(res)
 
-            return "I'm getting too many requests right now — please try again in a moment."
+            return {"content": "I'm getting too many requests right now — please try again in a moment."}
 
-        return f"Error talking to Groq: HTTP {res.status_code}"
+        return {"content": f"Error talking to Groq: HTTP {res.status_code}"}
 
     except Exception as e:
-        return f"Error talking to Groq: {str(e)}"
+        return {"content": f"Error talking to Groq: {str(e)}"}
+
+
+def _chat_with_groq(messages: list, api_key: str = None, model: str = None) -> str:
+    """Chat request against Groq, returning plain text content."""
+    return _chat_with_groq_raw(messages, api_key, model).get("content") or ""
+
 
 def _build_messages(system_prompt: str, history: list) -> list:
     """Build the messages list with system prompt prepended."""
     return [{"role": "system", "content": system_prompt}] + history
 
 
-def _ollama_model_ready(model: str) -> bool:
-    """Check if Ollama is up AND the specific model is installed.
-    Returns False immediately if the server is unreachable or the model isn't in the list.
-    This avoids 60s timeouts when the model isn't loaded.
-    """
-    try:
-        resp = requests.get(f"{OLLAMA_URL}/api/tags", timeout=2)
-        if resp.status_code != 200:
-            return False
-        models = [m.get("name", "") for m in resp.json().get("models", [])]
-        # Match by prefix so "llama3.2:3b" matches "llama3.2:3b" etc.
-        return any(model.split(":")[0] in m for m in models)
-    except Exception:
-        return False
-
-
 def chat_with_ollama(history: list, model: str = None, system_prompt: str = None):
-    """Send conversation history to specified model with system prompt with retry logic."""
-    url = f"{OLLAMA_URL}/api/chat"
-
-    # Use provided model or default
-    model_to_use = model or DEFAULT_MODEL
-    # Use provided system prompt or default
+    """Send conversation history + system prompt to Groq."""
+    model_to_use = model or GROQ_MODEL
     prompt_to_use = system_prompt or SYSTEM_PROMPT
+    messages = _build_messages(prompt_to_use, history)
 
-    # Skip Ollama if the model isn't installed — avoids 60s timeout per request
-    if not _ollama_model_ready(model_to_use):
-        logger.warning(f"Ollama model '{model_to_use}' not ready. Going straight to Groq.")
-        from app.config import CODING_MODEL
-        if model_to_use == CODING_MODEL and GROQ_API_KEY_CODING:
-            return _chat_with_groq(_build_messages(prompt_to_use, history), api_key=GROQ_API_KEY_CODING, model=GROQ_MODEL_CODING)
-        if GROQ_API_KEY:
-            return _chat_with_groq(_build_messages(prompt_to_use, history))
-        return "Error: Ollama model not available and no Groq API key is set."
+    from app.config import CODING_MODEL
+    if model_to_use == CODING_MODEL and GROQ_API_KEY_CODING:
+        return _chat_with_groq(messages, api_key=GROQ_API_KEY_CODING, model=GROQ_MODEL_CODING)
+    return _chat_with_groq(messages, model=model_to_use)
 
-    # Prepend system prompt to conversation
-    messages = [
-        {
-            "role": "system",
-            "content": prompt_to_use
-        }
-    ]
-    
-    # Add conversation history
-    messages.extend(history)
-
-    payload = {
-        "model": model_to_use,
-        "messages": messages,
-        "stream": False,
-        # Keep model in memory for faster subsequent requests.
-        "keep_alive": "5m"
-    }
-
-    # Retry logic
-    for attempt in range(MAX_RETRIES):
-        try:
-            res = requests.post(url, json=payload, timeout=TIMEOUT)
-            
-            if res.status_code == 200:
-                return res.json().get("message", {}).get("content", "")
-            else:
-                if attempt < MAX_RETRIES - 1:
-                    logger.warning(f"Attempt {attempt + 1} failed with status {res.status_code}, retrying...")
-                    time.sleep(RETRY_DELAY)
-                    continue
-                return f"Error talking to model: HTTP {res.status_code}"
-        
-        except requests.exceptions.Timeout:
-            # Timeout usually means model is slow/warming up; retries often repeat the same long wait.
-            logger.warning(f"Attempt {attempt + 1} timed out after {TIMEOUT}s")
-            break
-        
-        except requests.exceptions.ConnectionError:
-            if attempt < MAX_RETRIES - 1:
-                logger.warning(f"Attempt {attempt + 1} connection failed, retrying...")
-                time.sleep(RETRY_DELAY)
-                continue
-            return "Error: Could not connect to Ollama server"
-        
-        except Exception as e:
-            if attempt < MAX_RETRIES - 1:
-                logger.warning(f"Attempt {attempt + 1} failed with {str(e)}, retrying...")
-                time.sleep(RETRY_DELAY)
-                continue
-            return f"Error talking to model: {str(e)}"
-    
-    # Optional fallback model for resilience when the selected model is too slow/unavailable.
-    fallback_model = os.getenv("FAST_MODEL_FALLBACK", "").strip()
-    if fallback_model and fallback_model != model_to_use:
-        logger.warning(f"Trying fallback model due to failure: {fallback_model}")
-        fallback_payload = {
-            "model": fallback_model,
-            "messages": messages,
-            "stream": False,
-            "keep_alive": "5m"
-        }
-        try:
-            res = requests.post(url, json=fallback_payload, timeout=TIMEOUT)
-            if res.status_code == 200:
-                return res.json().get("message", {}).get("content", "")
-        except Exception:
-            pass
-
-    if GROQ_API_KEY or GROQ_API_KEY_CODING:
-        logger.warning("Ollama unavailable/slow. Falling back to Groq.")
-        # Use coding account+model if the requested model is the coding model
-        from app.config import CODING_MODEL
-        if model_to_use == CODING_MODEL and GROQ_API_KEY_CODING:
-            groq_resp = _chat_with_groq(messages, api_key=GROQ_API_KEY_CODING, model=GROQ_MODEL_CODING)
-        else:
-            groq_resp = _chat_with_groq(messages)
-        if not groq_resp.startswith("Error:"):
-            return groq_resp
-
-    return "Error: Model request timed out"
 
 def chat_with_ollama_single(message: str, history: list = None, model: str = None):
-    """Send a single message to the model with optional history (no system prompt) with retry logic."""
-    url = f"{OLLAMA_URL}/api/chat"
-    
-    # Use provided model or default
-    model_to_use = model or DEFAULT_MODEL
+    """Send a single message to the model with optional history (no system prompt)."""
+    model_to_use = model or GROQ_MODEL
+    messages = list(history) if history else []
+    messages.append({"role": "user", "content": message})
 
-    messages = []
-    
-    # Add history if provided
-    if history:
-        messages.extend(history)
-    
-    # Add the new message
-    messages.append({
-        "role": "user",
-        "content": message
-    })
+    from app.config import CODING_MODEL
+    if model_to_use == CODING_MODEL and GROQ_API_KEY_CODING:
+        return _chat_with_groq(messages, api_key=GROQ_API_KEY_CODING, model=GROQ_MODEL_CODING)
+    return _chat_with_groq(messages, model=model_to_use)
 
-    payload = {
-        "model": model_to_use,
-        "messages": messages,
-        "stream": False,
-        "keep_alive": "5m"
-    }
 
-    # Retry logic
-    for attempt in range(MAX_RETRIES):
-        try:
-            res = requests.post(url, json=payload, timeout=TIMEOUT)
-            
-            if res.status_code == 200:
-                return res.json().get("message", {}).get("content", "")
-            else:
-                if attempt < MAX_RETRIES - 1:
-                    logger.warning(f"Attempt {attempt + 1} failed with status {res.status_code}, retrying...")
-                    time.sleep(RETRY_DELAY)
-                    continue
-                return f"Error talking to model: HTTP {res.status_code}"
-        
-        except requests.exceptions.Timeout:
-            logger.warning(f"Attempt {attempt + 1} timed out after {TIMEOUT}s")
-            break
-        
-        except requests.exceptions.ConnectionError:
-            if attempt < MAX_RETRIES - 1:
-                logger.warning(f"Attempt {attempt + 1} connection failed, retrying...")
-                time.sleep(RETRY_DELAY)
-                continue
-            return "Error: Could not connect to Ollama server"
-        
-        except Exception as e:
-            if attempt < MAX_RETRIES - 1:
-                logger.warning(f"Attempt {attempt + 1} failed with {str(e)}, retrying...")
-                time.sleep(RETRY_DELAY)
-                continue
-            return f"Error talking to model: {str(e)}"
-    
-    if GROQ_API_KEY or GROQ_API_KEY_CODING:
-        logger.warning("Ollama unavailable/slow (single). Falling back to Groq.")
-        from app.config import CODING_MODEL
-        if model_to_use == CODING_MODEL and GROQ_API_KEY_CODING:
-            groq_resp = _chat_with_groq(messages, api_key=GROQ_API_KEY_CODING, model=GROQ_MODEL_CODING)
-        else:
-            groq_resp = _chat_with_groq(messages)
-        if not groq_resp.startswith("Error:"):
-            return groq_resp
+def chat_with_tools(history: list, tools: list, model: str = None, system_prompt: str = None) -> dict:
+    """Chat using Groq's native function-calling API.
 
-    return "Error: Model request timed out"
+    Returns the raw assistant message dict: {"content": ..., "tool_calls": [...]}
+    where each tool_call is {"id", "type": "function", "function": {"name", "arguments"}}.
+    """
+    model_to_use = model or GROQ_MODEL
+    prompt_to_use = system_prompt or SYSTEM_PROMPT
+    messages = _build_messages(prompt_to_use, history)
+
+    from app.config import CODING_MODEL
+    if model_to_use == CODING_MODEL and GROQ_API_KEY_CODING:
+        return _chat_with_groq_raw(messages, api_key=GROQ_API_KEY_CODING, model=GROQ_MODEL_CODING, tools=tools)
+    return _chat_with_groq_raw(messages, model=model_to_use, tools=tools)

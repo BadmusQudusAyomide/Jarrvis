@@ -141,6 +141,66 @@ TOOLS = {
     "download_media": DownloadMediaTool()
 }
 
+# Tool categories for context-scoped schema selection — sending all 58 tool
+# schemas on every request bloats the payload and eats into rate limits, so
+# we only send the ones relevant to what the user actually asked.
+TOOL_CATEGORIES: dict[str, list[str]] = {
+    "core": ["get_time", "get_system_info", "calculate", "convert_units", "web_search", "web_fetch"],
+    "file": ["read_file", "write_file", "edit_file", "list_directory", "search_files", "delete_file", "move_rename"],
+    "code": ["execute_code", "index_codebase", "search_codebase", "get_file_summary"],
+    "shell": ["execute_command"],
+    "git": ["git_status", "git_log", "git_diff", "git_add", "git_commit", "git_push", "git_pull", "git_checkout", "git_create_branch"],
+    "browser": ["browser_open", "browser_get_text", "browser_screenshot", "browser_click", "browser_fill",
+                "browser_close", "browser_scroll", "browser_execute_js", "browser_get_html"],
+    "notification": ["send_notification"],
+    "clipboard": ["read_clipboard", "write_clipboard"],
+    "screenshot": ["screenshot"],
+    "calendar": ["get_calendar_events", "create_calendar_event", "get_todays_events"],
+    "gmail": ["get_emails", "read_email", "send_email", "mark_email_as_read", "get_unread_emails"],
+    "twitter": ["post_tweet", "get_home_timeline", "search_tweets", "get_user_tweets", "delete_tweet"],
+    "process": ["list_processes", "kill_process", "launch_app", "is_process_running"],
+    "media": ["download_media"],
+}
+
+_CATEGORY_TRIGGERS: dict[str, list[str]] = {
+    "file": ["file", "folder", "directory", "path", "read the", "write to", "rename", "delete the"],
+    "code": ["code", "script", "run this", "execute this", "codebase", "function", "debug",
+              "summarize", "explain", "describe", "index my", "program"],
+    "shell": ["execute command", "run command", "run this command", "command:", "terminal", "command line",
+               "cmd ", "shell command", "execute_command"],
+    "git": ["git", "commit", "branch", "repo", "push", "pull request", "checkout"],
+    "browser": ["browser", "website", "url", "http://", "https://", "navigate", "webpage", "click on", "web page"],
+    "notification": ["notification", "notify", "remind me", "alert"],
+    "clipboard": ["clipboard", "copy this", "paste"],
+    "screenshot": ["screenshot", "screen shot", "capture screen"],
+    "calendar": ["calendar", "schedule", "meeting", "appointment", "event"],
+    "gmail": ["email", "gmail", "inbox", "e-mail"],
+    "twitter": ["tweet", "twitter", "x.com", "timeline"],
+    "process": ["process", "launch app", "open app", "kill ", "running app", "task manager"],
+    "media": ["download", "youtube", "tiktok", "instagram video"],
+}
+
+# Fallback when no category-specific keyword matches — the most generally
+# useful tools for this assistant's day-to-day (coding/file/system) use.
+_DEFAULT_FALLBACK_CATEGORIES = ["file", "code"]
+
+
+def get_relevant_tool_names(message: str) -> list[str]:
+    """Pick which tool categories are relevant to a message, to avoid sending
+    every tool schema on every request."""
+    lower = (message or "").lower()
+    matched_categories = [cat for cat, keywords in _CATEGORY_TRIGGERS.items()
+                           if any(kw in lower for kw in keywords)]
+
+    if not matched_categories:
+        matched_categories = _DEFAULT_FALLBACK_CATEGORIES
+
+    names = list(TOOL_CATEGORIES["core"])
+    for cat in matched_categories:
+        names.extend(TOOL_CATEGORIES[cat])
+    return names
+
+
 def get_tool_descriptions(tool_names: list[str] = None) -> str:
     """Generate tool descriptions from schemas for the system prompt."""
     descriptions = []
@@ -156,6 +216,43 @@ def get_tool_descriptions(tool_names: list[str] = None) -> str:
             param_desc = f" Parameters: {params}"
         descriptions.append(f"- {schema.name}: {schema.description}. Returns: {schema.return_type}.{param_desc}")
     return "\n".join(descriptions)
+
+_JSON_SCHEMA_TYPES = {"dict": "object", "list": "array"}
+
+
+def get_tool_schemas(tool_names: list[str] = None) -> list[dict]:
+    """Build OpenAI/Groq-style function-calling tool schemas from the tool registry."""
+    selected = TOOLS
+    if tool_names:
+        selected = {name: TOOLS[name] for name in tool_names if name in TOOLS}
+
+    schemas = []
+    for tool_name, tool in selected.items():
+        schema = tool.schema
+        properties = {}
+        required = []
+        for p in schema.parameters:
+            properties[p.name] = {
+                "type": _JSON_SCHEMA_TYPES.get(p.type, p.type),
+                "description": p.description,
+            }
+            if p.required:
+                required.append(p.name)
+
+        schemas.append({
+            "type": "function",
+            "function": {
+                "name": schema.name,
+                "description": schema.description,
+                "parameters": {
+                    "type": "object",
+                    "properties": properties,
+                    "required": required,
+                },
+            },
+        })
+    return schemas
+
 
 def execute_tool(tool_name: str, args: dict = None):
     """Execute a tool by name with optional arguments with enhanced error handling."""

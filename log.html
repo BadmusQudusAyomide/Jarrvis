@@ -1,0 +1,190 @@
+
+PS C:\Users\HP\Documents\Jarvis> python -m uvicorn app.main:app --reload --port 8080
+INFO:     Will watch for changes in these directories: ['C:\\Users\\HP\\Documents\\Jarvis']
+INFO:     Uvicorn running on http://127.0.0.1:8080 (Press CTRL+C to quit)
+INFO:     Started reloader process [18104] using WatchFiles
+INFO:app.utils.task_queue:Registered handler for task type: example
+INFO:app.utils.task_queue:Registered handler for task type: planned_agent
+2026-06-18 16:25:07 | INFO     | root | ============================================================
+2026-06-18 16:25:07 | INFO     | root | Jarvis AI Logging Started
+2026-06-18 16:25:07 | INFO     | root | Log files: C:\Users\HP\Documents\Jarvis\logs
+2026-06-18 16:25:07 | INFO     | root | ============================================================
+INFO:     Started server process [8708]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+2026-06-18 16:25:07 | INFO     | app.main | Starting Telegram bot...
+2026-06-18 16:25:08 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getMe "HTTP/1.1 200 OK"
+2026-06-18 16:25:08 | INFO     | apscheduler.scheduler | Scheduler started
+2026-06-18 16:25:08 | INFO     | telegram.ext.Application | Application started
+2026-06-18 16:25:08 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/deleteWebhook "HTTP/1.1 200 OK"
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [8708]
+INFO:     Stopping reloader process [18104]
+PS C:\Users\HP\Documents\Jarvis> 
+PS C:\Users\HP\Documents\Jarvis> 
+PS C:\Users\HP\Documents\Jarvis> python -m uvicorn app.main:app --reload --port 8080
+INFO:     Will watch for changes in these directories: ['C:\\Users\\HP\\Documents\\Jarvis']
+INFO:     Uvicorn running on http://127.0.0.1:8080 (Press CTRL+C to quit)
+INFO:     Started reloader process [17016] using WatchFiles
+INFO:app.utils.task_queue:Registered handler for task type: example
+INFO:app.utils.task_queue:Registered handler for task type: planned_agent
+2026-06-18 16:25:35 | INFO     | root | ============================================================
+2026-06-18 16:25:35 | INFO     | root | Jarvis AI Logging Started
+2026-06-18 16:25:35 | INFO     | root | Log files: C:\Users\HP\Documents\Jarvis\logs
+2026-06-18 16:25:35 | INFO     | root | ============================================================
+INFO:     Started server process [20560]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+2026-06-18 16:25:35 | INFO     | app.main | Starting Telegram bot...
+2026-06-18 16:25:37 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getMe "HTTP/1.1 200 OK"
+2026-06-18 16:25:37 | INFO     | apscheduler.scheduler | Scheduler started
+2026-06-18 16:25:37 | INFO     | telegram.ext.Application | Application started
+2026-06-18 16:25:37 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/deleteWebhook "HTTP/1.1 200 OK"
+2026-06-18 16:25:43 | INFO     | app.utils.task_queue | Submitted task 5939285b of type planned_agent
+INFO:     127.0.0.1:4161 - "POST /tasks/submit HTTP/1.1" 200 OK
+2026-06-18 16:25:43 | INFO     | app.utils.task_queue | Starting task 5939285b
+2026-06-18 16:25:47 | INFO     | app.llm.router | Intent: general → Model: llama3.2:3b
+2026-06-18 16:25:48 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:4200 - "GET /tasks/%3CTASK_ID%3E/status HTTP/1.1" 200 OK
+2026-06-18 16:25:55 | WARNING  | app.llm.ollama | Attempt 1 timed out after 8s
+2026-06-18 16:25:55 | WARNING  | app.llm.ollama | Ollama unavailable/slow. Falling back to Groq.
+2026-06-18 16:25:59 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:26:00 | WARNING  | app.utils.parser | No valid JSON found, treating entire text as response: I'm Jarvis, an advanced personal AI assistant built by and for Qudus. I'm here to help, and I'll fol...
+2026-06-18 16:26:00 | INFO     | app.agents.core_agent | [AGENT] Step 1: Returning response
+2026-06-18 16:26:08 | WARNING  | app.llm.ollama | Attempt 1 timed out after 8s
+2026-06-18 16:26:08 | WARNING  | app.llm.ollama | Ollama unavailable/slow. Falling back to Groq.
+2026-06-18 16:26:09 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:26:10 | INFO     | app.utils.parser | Successfully parsed action: ToolCall
+2026-06-18 16:26:10 | WARNING  | app.agents.core_agent | [AGENT] Ignoring unknown tool request: tool_name
+2026-06-18 16:26:18 | WARNING  | app.llm.ollama | Attempt 1 timed out after 8s
+2026-06-18 16:26:18 | WARNING  | app.llm.ollama | Ollama unavailable/slow. Falling back to Groq.
+2026-06-18 16:26:18 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:26:18 | INFO     | interfaces.telegram.bot | [7350141970] text: hello
+2026-06-18 16:26:19 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/sendChatAction "HTTP/1.1 200 OK"
+2026-06-18 16:26:19 | INFO     | app.llm.router | Intent: general → Model: llama3.2:3b
+2026-06-18 16:26:19 | INFO     | app.api.chat | Processing message with model llama3.2:3b, history length: 1
+2026-06-18 16:26:19 | INFO     | app.agents.core_agent | [AGENT] Direct response: smalltalk
+INFO:     127.0.0.1:4223 - "POST /chat HTTP/1.1" 200 OK
+2026-06-18 16:26:19 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/sendMessage "HTTP/1.1 200 OK"
+2026-06-18 16:26:20 | WARNING  | app.utils.parser | No valid JSON found, treating entire text as response: I'm here to assist you. I can recall our conversation history and will do my best to understand the ...
+2026-06-18 16:26:20 | INFO     | app.agents.core_agent | [AGENT] Step 2: Returning response
+2026-06-18 16:26:23 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:26:23 | INFO     | interfaces.telegram.bot | [7350141970] text: Please inspect app/agents/planning.py, app/api/tasks.py, and
+2026-06-18 16:26:23 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/sendChatAction "HTTP/1.1 200 OK"
+2026-06-18 16:26:24 | INFO     | app.llm.router | Intent: coding → Model: deepseek-coder-v2
+2026-06-18 16:26:24 | INFO     | app.api.chat | Processing message with model deepseek-coder-v2, history length: 3
+2026-06-18 16:26:24 | INFO     | app.api.chat | Planning gate triggered for message
+2026-06-18 16:26:27 | WARNING  | app.agents.planning | Could not parse planner JSON: Invalid control character at: line 1 column 102 (char 101)
+2026-06-18 16:26:27 | INFO     | app.tools.codebase_tools | Using existing codebase collection: codebase_index
+2026-06-18 16:26:27 | INFO     | app.tools.codebase_tools | Codebase search for 'Original task: Please inspect app/agents/planning.py, app/api/tasks.py, and app/utils/task_queue.py, then fix the retry and dependency handling.
+Plan title: Fallback plan
+Current step: Please inspect app/agents/planning.py, app/api/tasks.py, and app/utils/task_queue.py, then fix the retry and dependency handling.
+Execute only this step and return the result clearly.' returned 3 results
+2026-06-18 16:26:27 | INFO     | app.tools.system_tools | Tool search_codebase executed successfully
+2026-06-18 16:26:27 | INFO     | app.agents.core_agent | [AGENT] Injected codebase context for coding query
+2026-06-18 16:26:27 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/sendChatAction "HTTP/1.1 200 OK"
+2026-06-18 16:26:28 | WARNING  | app.llm.ollama | Attempt 1 timed out after 8s
+2026-06-18 16:26:28 | WARNING  | app.llm.ollama | Ollama unavailable/slow. Falling back to Groq.
+2026-06-18 16:26:30 | WARNING  | app.utils.parser | No valid JSON found, treating entire text as response: I'm Jarvis, the advanced personal AI assistant, built by and for Qudus. I'm here to assist with your...
+2026-06-18 16:26:30 | INFO     | app.agents.core_agent | [AGENT] Step 1: Returning response
+2026-06-18 16:26:32 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/sendChatAction "HTTP/1.1 200 OK"
+2026-06-18 16:26:33 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:26:35 | WARNING  | app.llm.ollama | Attempt 1 timed out after 8s
+2026-06-18 16:26:35 | WARNING  | app.llm.ollama | Ollama unavailable/slow. Falling back to Groq.
+2026-06-18 16:26:36 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/sendChatAction "HTTP/1.1 200 OK"
+2026-06-18 16:26:37 | INFO     | app.tools.file_tools | Reading file: C:\Users\HP\Documents\Jarvis\app\agents\planning.py (limit=500 lines)
+2026-06-18 16:26:37 | INFO     | app.tools.system_tools | Tool read_file executed successfully
+2026-06-18 16:26:37 | INFO     | app.agents.core_agent | [AGENT] Step 1: Called read_file, got: from __future__ import annotations
+
+import json
+im...
+2026-06-18 16:26:38 | WARNING  | app.llm.ollama | Attempt 1 timed out after 8s
+2026-06-18 16:26:38 | WARNING  | app.llm.ollama | Ollama unavailable/slow. Falling back to Groq.
+2026-06-18 16:26:40 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/sendChatAction "HTTP/1.1 200 OK"
+2026-06-18 16:26:40 | WARNING  | app.utils.parser | No valid JSON found, treating entire text as response: I'm Jarvis, your personal AI assistant. I'm ready to help Qudus with whatever task you may have. Ple...
+2026-06-18 16:26:40 | INFO     | app.agents.core_agent | [AGENT] Step 1: Returning response
+2026-06-18 16:26:44 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:26:45 | WARNING  | app.llm.ollama | Attempt 1 timed out after 8s
+2026-06-18 16:26:45 | WARNING  | app.llm.ollama | Ollama unavailable/slow. Falling back to Groq.
+2026-06-18 16:26:45 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/sendChatAction "HTTP/1.1 200 OK"
+2026-06-18 16:26:46 | INFO     | app.tools.file_tools | Reading file: C:\Users\HP\Documents\Jarvis\app\api\tasks.py (limit=500 lines)
+2026-06-18 16:26:46 | INFO     | app.tools.system_tools | Tool read_file executed successfully
+2026-06-18 16:26:46 | INFO     | app.agents.core_agent | [AGENT] Step 2: Called read_file, got: """API endpoints for background task management.""...
+2026-06-18 16:26:48 | WARNING  | app.llm.ollama | Attempt 1 timed out after 8s
+2026-06-18 16:26:48 | WARNING  | app.llm.ollama | Ollama unavailable/slow. Falling back to Groq.
+2026-06-18 16:26:49 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/sendChatAction "HTTP/1.1 200 OK"
+2026-06-18 16:26:50 | WARNING  | app.utils.parser | No valid JSON found, treating entire text as response: I'm Jarvis, your advanced personal AI assistant. I'm here to help and support you with your daily ta...
+2026-06-18 16:26:50 | INFO     | app.agents.core_agent | [AGENT] Step 1: Returning response
+2026-06-18 16:26:50 | INFO     | app.tools.git_tools | Committed to C:\Users\HP\Documents\Jarvis: Update from Jarvis
+2026-06-18 16:26:50 | INFO     | app.tools.system_tools | Tool git_commit executed successfully
+2026-06-18 16:26:50 | INFO     | app.agents.core_agent | [AGENT] Direct action: git_commit
+2026-06-18 16:26:50 | INFO     | app.utils.task_queue | Task 5939285b completed successfully
+2026-06-18 16:26:53 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/sendChatAction "HTTP/1.1 200 OK"
+2026-06-18 16:26:54 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:26:54 | WARNING  | app.llm.ollama | Attempt 1 timed out after 8s
+2026-06-18 16:26:54 | WARNING  | app.llm.ollama | Ollama unavailable/slow. Falling back to Groq.
+2026-06-18 16:26:56 | WARNING  | app.llm.ollama | Groq 429 rate limit — waiting 1s then retrying...
+2026-06-18 16:26:57 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/sendChatAction "HTTP/1.1 200 OK"
+2026-06-18 16:27:02 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/sendChatAction "HTTP/1.1 200 OK"
+2026-06-18 16:27:02 | INFO     | app.tools.file_tools | Reading file: C:\Users\HP\Documents\Jarvis\app\utils\task_queue.py (limit=500 lines)
+2026-06-18 16:27:02 | INFO     | app.tools.system_tools | Tool read_file executed successfully
+2026-06-18 16:27:02 | INFO     | app.agents.core_agent | [AGENT] Step 3: Called read_file, got: """Background task queue for long-running operatio...
+2026-06-18 16:27:04 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:27:06 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/sendChatAction "HTTP/1.1 200 OK"
+2026-06-18 16:27:10 | WARNING  | app.llm.ollama | Attempt 1 timed out after 8s
+2026-06-18 16:27:10 | WARNING  | app.llm.ollama | Ollama unavailable/slow. Falling back to Groq.
+2026-06-18 16:27:10 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/sendChatAction "HTTP/1.1 200 OK"
+2026-06-18 16:27:11 | WARNING  | app.llm.ollama | Groq 429 rate limit — waiting 27s then retrying...
+2026-06-18 16:27:15 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:27:15 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/sendChatAction "HTTP/1.1 200 OK"
+2026-06-18 16:27:19 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/sendChatAction "HTTP/1.1 200 OK"
+2026-06-18 16:27:24 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/sendChatAction "HTTP/1.1 200 OK"
+2026-06-18 16:27:25 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:27:28 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/sendChatAction "HTTP/1.1 200 OK"
+2026-06-18 16:27:32 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/sendChatAction "HTTP/1.1 200 OK"
+2026-06-18 16:27:36 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:27:38 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/sendChatAction "HTTP/1.1 200 OK"
+2026-06-18 16:27:42 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/sendChatAction "HTTP/1.1 200 OK"
+2026-06-18 16:27:43 | INFO     | app.agents.core_agent | [AGENT] Step 4: Task complete
+INFO:     127.0.0.1:4230 - "POST /chat HTTP/1.1" 200 OK
+2026-06-18 16:27:43 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/sendMessage "HTTP/1.1 200 OK"
+2026-06-18 16:27:46 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:27:56 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:28:06 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:28:16 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:28:27 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:28:37 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:28:47 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:28:57 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:29:08 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:29:18 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:29:28 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:29:39 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:29:49 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:29:59 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:30:10 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:30:20 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:30:30 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:30:40 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:30:51 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:31:02 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:31:12 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:31:23 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:31:33 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:31:43 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:31:53 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:32:04 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:32:14 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:32:25 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:32:35 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:32:45 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:32:55 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:33:06 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:33:16 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:33:26 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:33:36 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:33:47 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:33:58 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"
+2026-06-18 16:34:08 | INFO     | httpx | HTTP Request: POST https://api.telegram.org/bot8637179271:AAGe8UESKiufdUO1WU1l6SsbjSkLCc1ZrNg/getUpdates "HTTP/1.1 200 OK"

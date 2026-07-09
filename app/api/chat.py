@@ -32,6 +32,8 @@ from app.memory.profile import (
 )
 from app.memory.context_manager import manage_context
 from app.agents.core_agent import Agent
+from app.agents.planning import PlanOrchestrator, should_plan_task
+from app.agents.confirmation import get_pending_action, clear_pending_action, describe_action
 from app.config import DEFAULT_MODEL, CODING_MODEL, get_system_prompt
 from app.tools.system_tools import execute_tool
 
@@ -131,6 +133,25 @@ def chat(req: ChatRequest):
             add_message(req.session_id, "assistant", response_text)
             return {"response": response_text}
 
+    pending_action = get_pending_action(req.session_id)
+    if pending_action:
+        msg = normalized_msg.lower()
+        if msg in {"yes", "y", "confirm", "proceed", "ok", "okay"}:
+            tool_name = pending_action.get("tool")
+            tool_args = pending_action.get("args", {})
+            clear_pending_action(req.session_id)
+            result = execute_tool(tool_name, tool_args)
+            response_text = str(result)
+            add_message(req.session_id, "user", req.message)
+            add_message(req.session_id, "assistant", response_text)
+            return {"response": response_text}
+        if msg in {"no", "n", "cancel", "stop"}:
+            clear_pending_action(req.session_id)
+            response_text = f"Okay, I cancelled: {describe_action(pending_action.get('tool'), pending_action.get('args', {}))}"
+            add_message(req.session_id, "user", req.message)
+            add_message(req.session_id, "assistant", response_text)
+            return {"response": response_text}
+
     # 0. Deterministic profile capture + direct recall
     extracted_name = extract_name(req.message)
     if extracted_name:
@@ -219,8 +240,18 @@ def chat(req: ChatRequest):
 
     # 8. Create agent and run autonomous loop
     logger.info(f"Processing message with model {chosen_model}, history length: {len(history)}")
-    agent = Agent(model=chosen_model)
-    response_text = _normalize_response_text(agent.run(req.message, history, custom_system_prompt))
+    if should_plan_task(req.message):
+        logger.info("Planning gate triggered for message")
+        orchestrator = PlanOrchestrator()
+        response_text = orchestrator.run(
+            task=req.message,
+            history=history,
+            system_prompt=custom_system_prompt,
+            model=chosen_model,
+        )
+    else:
+        agent = Agent(model=chosen_model)
+        response_text = _normalize_response_text(agent.run(req.message, history, custom_system_prompt, session_id=req.session_id))
     
     # 9. Add final response to history
     add_message(req.session_id, "assistant", response_text)
@@ -237,6 +268,29 @@ def chat_stream(req: ChatRequest):
     """Streaming chat endpoint backed by the full agent/tool loop."""
 
     def generate():
+        # 0. Resolve any pending destructive-action confirmation first
+        normalized_msg = req.message.strip().lower()
+        pending_action = get_pending_action(req.session_id)
+        if pending_action:
+            if normalized_msg in {"yes", "y", "confirm", "proceed", "ok", "okay"}:
+                tool_name = pending_action.get("tool")
+                tool_args = pending_action.get("args", {})
+                clear_pending_action(req.session_id)
+                response_text = str(execute_tool(tool_name, tool_args))
+                add_message(req.session_id, "user", req.message)
+                add_message(req.session_id, "assistant", response_text)
+                yield json.dumps({"token": response_text}) + "\n"
+                yield json.dumps({"done": True}) + "\n"
+                return
+            if normalized_msg in {"no", "n", "cancel", "stop"}:
+                clear_pending_action(req.session_id)
+                response_text = f"Okay, I cancelled: {describe_action(pending_action.get('tool'), pending_action.get('args', {}))}"
+                add_message(req.session_id, "user", req.message)
+                add_message(req.session_id, "assistant", response_text)
+                yield json.dumps({"token": response_text}) + "\n"
+                yield json.dumps({"done": True}) + "\n"
+                return
+
         # 1. Retrieve memories and build context
         memories = retrieve_memories(req.message, req.session_id)
         memory_context = build_memory_context(memories)
@@ -261,8 +315,18 @@ def chat_stream(req: ChatRequest):
 
         # 6. Run full agent loop (tools enabled), then stream back by chunks
         logger.info(f"Streaming agent response with model {chosen_model}, history length: {len(history)}")
-        agent = Agent(model=chosen_model)
-        complete_text = _normalize_response_text(agent.run(req.message, history, system_prompt))
+        if should_plan_task(req.message):
+            logger.info("Planning gate triggered for streaming request")
+            orchestrator = PlanOrchestrator()
+            complete_text = orchestrator.run(
+                task=req.message,
+                history=history,
+                system_prompt=system_prompt,
+                model=chosen_model,
+            )
+        else:
+            agent = Agent(model=chosen_model)
+            complete_text = _normalize_response_text(agent.run(req.message, history, system_prompt, session_id=req.session_id))
 
         # 7. Emit response in chunks so frontend streaming UX still works
         chunk_size = 40

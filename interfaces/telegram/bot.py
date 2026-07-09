@@ -228,24 +228,13 @@ async def profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 
 async def model_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    ollama_url = os.getenv("OLLAMA_URL", "http://localhost:11434")
-    default_model = os.getenv("DEFAULT_MODEL", "llama3.2:3b")
-    groq_model = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+    groq_model = os.getenv("GROQ_MODEL", os.getenv("DEFAULT_MODEL", "llama-3.3-70b-versatile"))
     groq_key = os.getenv("GROQ_API_KEY", "")
 
-    ollama_ok = False
-    try:
-        r = requests.get(f"{ollama_url}/api/tags", timeout=3)
-        ollama_ok = r.status_code == 200
-    except Exception:
-        pass
-
-    if ollama_ok:
-        status = f"Local model active: {default_model}\nOllama is running."
-    elif groq_key:
-        status = f"Local Ollama is offline.\nUsing Groq cloud: {groq_model}"
+    if groq_key:
+        status = f"Using Groq cloud: {groq_model}"
     else:
-        status = "No model available! Ollama is offline and GROQ_API_KEY is not set."
+        status = "No model available! GROQ_API_KEY is not set."
 
     await update.message.reply_text(status)
 
