@@ -1,6 +1,10 @@
 import { ChatRequest, ChatResponse, StreamToken, SystemStatsResponse } from './types'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+
+export function getWakeWordWsUrl(): string {
+  return API_URL.replace(/^http/, 'ws') + '/voice/wakeword'
+}
 
 export async function sendMessage(message: string, sessionId: string): Promise<ChatResponse> {
   const response = await fetch(`${API_URL}/chat`, {

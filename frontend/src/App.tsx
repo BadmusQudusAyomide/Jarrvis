@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Send, Menu, Plus, MessageSquare, Cpu, Settings, Zap, Activity, HardDrive, Terminal, Mic, Square, Volume2, VolumeX } from 'lucide-react'
 import { Message } from './types'
-import { sendMessage, clearSession, getSystemStats, transcribeAudio, synthesizeSpeech } from './api'
+import { sendMessage, clearSession, getSystemStats, transcribeAudio, synthesizeSpeech, getWakeWordWsUrl } from './api'
 import VoiceOrb, { VoiceState } from './VoiceOrb'
 
 interface SystemStats {
@@ -13,6 +13,7 @@ interface SystemStats {
 
 const SESSION_STORAGE_KEY = 'jarvis_session_id'
 const SHOW_TRANSCRIPT_KEY = 'jarvis_show_transcript'
+const HANDS_FREE_KEY = 'jarvis_hands_free'
 const GREETING = 'JARVIS online. All systems operational. How can I assist you today?'
 
 function getOrCreateSessionId(): string {
@@ -60,6 +61,7 @@ function App() {
   const [voiceError, setVoiceError] = useState<string | null>(null)
   const [showTranscript, setShowTranscript] = useState<boolean>(getStoredShowTranscript)
   const [showSettings, setShowSettings] = useState(false)
+  const [handsFreeMode, setHandsFreeMode] = useState<boolean>(() => localStorage.getItem(HANDS_FREE_KEY) === 'true')
 
   const audioCtxRef = useRef<AudioContext | null>(null)
   const micStreamRef = useRef<MediaStream | null>(null)
@@ -70,6 +72,19 @@ function App() {
   const hasSpokenRef = useRef(false)
   const silenceStartRef = useRef<number | null>(null)
   const recordingStartRef = useRef(0)
+
+  // Wake word / hands-free
+  const wakeWordWsRef = useRef<WebSocket | null>(null)
+  const wakeWordAudioCtxRef = useRef<AudioContext | null>(null)
+  const wakeWordProcessorRef = useRef<ScriptProcessorNode | null>(null)
+  const handsFreeStreamOwnedRef = useRef(false)
+
+  // Kept in sync with state via effects below so closures created once (e.g.
+  // the wake-word WebSocket's onmessage handler) always read live values
+  // instead of freezing whatever the state was when they were created.
+  const autoSpeakRef = useRef(autoSpeak)
+  const isLoadingRef = useRef(isLoading)
+  const busyRef = useRef(false) // true whenever voice pipeline is not idle/available
 
   const getAudioCtx = useCallback(() => {
     if (!audioCtxRef.current) {
@@ -85,6 +100,12 @@ function App() {
   useEffect(() => {
     localStorage.setItem(SHOW_TRANSCRIPT_KEY, String(showTranscript))
   }, [showTranscript])
+
+  useEffect(() => { autoSpeakRef.current = autoSpeak }, [autoSpeak])
+  useEffect(() => { isLoadingRef.current = isLoading }, [isLoading])
+  useEffect(() => {
+    busyRef.current = voiceState !== 'idle' || isTranscribing
+  }, [voiceState, isTranscribing])
 
   // Greet once when the app opens
   useEffect(() => {
@@ -179,8 +200,13 @@ function App() {
   const startRecording = async () => {
     try {
       setVoiceError(null)
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      micStreamRef.current = stream
+      // Reuse the persistent hands-free mic stream if one is already open,
+      // instead of requesting a second concurrent stream.
+      let stream = micStreamRef.current
+      if (!stream) {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        micStreamRef.current = stream
+      }
 
       const ctx = getAudioCtx()
       const source = ctx.createMediaStreamSource(stream)
@@ -252,8 +278,12 @@ function App() {
     const spoke = hasSpokenRef.current
 
     recorder.onstop = async () => {
-      micStreamRef.current?.getTracks().forEach(t => t.stop())
-      micStreamRef.current = null
+      // Hands-free mode keeps the mic stream alive between commands so it
+      // can keep listening for the next wake word; tap-to-talk releases it.
+      if (!handsFreeStreamOwnedRef.current) {
+        micStreamRef.current?.getTracks().forEach(t => t.stop())
+        micStreamRef.current = null
+      }
       setVoiceAnalyser(null)
       setVoiceState('idle')
 
@@ -289,8 +319,101 @@ function App() {
     }
   }
 
+  const stopHandsFreeListening = () => {
+    handsFreeStreamOwnedRef.current = false
+
+    if (wakeWordProcessorRef.current) {
+      wakeWordProcessorRef.current.disconnect()
+      wakeWordProcessorRef.current = null
+    }
+    if (wakeWordAudioCtxRef.current) {
+      wakeWordAudioCtxRef.current.close().catch(() => {})
+      wakeWordAudioCtxRef.current = null
+    }
+    if (wakeWordWsRef.current) {
+      wakeWordWsRef.current.close()
+      wakeWordWsRef.current = null
+    }
+    // Only release the mic if nothing else (an active command recording) is using it
+    if (!busyRef.current) {
+      micStreamRef.current?.getTracks().forEach(t => t.stop())
+      micStreamRef.current = null
+    }
+  }
+
+  const startHandsFreeListening = async () => {
+    try {
+      setVoiceError(null)
+      let stream = micStreamRef.current
+      if (!stream) {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        micStreamRef.current = stream
+      }
+      handsFreeStreamOwnedRef.current = true
+
+      const ws = new WebSocket(getWakeWordWsUrl())
+      wakeWordWsRef.current = ws
+
+      ws.onmessage = event => {
+        try {
+          const data = JSON.parse(event.data)
+          if (data.detected && !busyRef.current) {
+            startRecording()
+          }
+        } catch {
+          // ignore malformed messages
+        }
+      }
+      ws.onerror = () => {
+        setVoiceError('Wake-word listener lost connection')
+      }
+
+      // openWakeWord needs 16-bit 16kHz mono PCM — run a dedicated 16kHz
+      // AudioContext so no manual resampling is needed.
+      const ctx = new AudioContext({ sampleRate: 16000 })
+      wakeWordAudioCtxRef.current = ctx
+      const source = ctx.createMediaStreamSource(stream)
+      const processor = ctx.createScriptProcessor(4096, 1, 1)
+      wakeWordProcessorRef.current = processor
+
+      processor.onaudioprocess = e => {
+        if (busyRef.current) return
+        if (ws.readyState !== WebSocket.OPEN) return
+        const input = e.inputBuffer.getChannelData(0)
+        const pcm16 = new Int16Array(input.length)
+        for (let i = 0; i < input.length; i++) {
+          const s = Math.max(-1, Math.min(1, input[i]))
+          pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7fff
+        }
+        ws.send(pcm16.buffer)
+      }
+
+      // ScriptProcessorNode only fires its callback while connected to a
+      // destination — route through a silent gain so nothing is audible.
+      const silentGain = ctx.createGain()
+      silentGain.gain.value = 0
+      source.connect(processor)
+      processor.connect(silentGain)
+      silentGain.connect(ctx.destination)
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err)
+      setVoiceError(`Couldn't start hands-free listening: ${detail}`)
+      setHandsFreeMode(false)
+    }
+  }
+
+  useEffect(() => {
+    localStorage.setItem(HANDS_FREE_KEY, String(handsFreeMode))
+    if (handsFreeMode) {
+      startHandsFreeListening()
+    } else {
+      stopHandsFreeListening()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [handsFreeMode])
+
   const sendUserMessage = async (text: string) => {
-    if (!text.trim() || isLoading) return
+    if (!text.trim() || isLoadingRef.current) return
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -321,7 +444,7 @@ function App() {
             : msg
         )
       )
-      if (autoSpeak) {
+      if (autoSpeakRef.current) {
         speak(result.response)
       }
     } catch (err) {
@@ -516,6 +639,18 @@ function App() {
                   onChange={e => setAutoSpeak(e.target.checked)}
                 />
               </label>
+
+              <label className="settings-row">
+                <div className="settings-row-text">
+                  <span className="settings-row-title">Hands-free ("Hey Jarvis")</span>
+                  <span className="settings-row-desc">Mic stays on and listens for the wake word — no tapping needed</span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={handsFreeMode}
+                  onChange={e => setHandsFreeMode(e.target.checked)}
+                />
+              </label>
             </div>
           </div>
         )}
@@ -566,6 +701,8 @@ function App() {
                 ? 'SPEAKING…'
                 : isTranscribing
                 ? 'TRANSCRIBING…'
+                : handsFreeMode
+                ? "SAY “HEY JARVIS”"
                 : 'TAP THE ORB TO SPEAK'}
             </div>
             {voiceError && (
