@@ -14,6 +14,7 @@ from app.api.tasks import router as tasks_router
 from app.api.system import router as system_router
 from app.api.whatsapp import router as whatsapp_router
 from app.api.voice import router as voice_router
+from app.ambient.proactive import run_proactive_check
 
 # Windows async event loop policy for Playwright
 if sys.platform == "windows":
@@ -61,13 +62,33 @@ def _start_telegram_bot() -> None:
         logger.error(f"Telegram bot crashed: {e}", exc_info=True)
 
 
+def _start_ambient_loop(scheduler) -> None:
+    """Ambient/proactive checks (calendar, email, system health) — same flag
+    that keeps a local dev instance from double-polling Telegram also keeps
+    it from double-sending proactive notifications alongside the deployed one."""
+    if os.getenv("DISABLE_TELEGRAM_BOT", "false").strip().lower() == "true":
+        logger.info("DISABLE_TELEGRAM_BOT is set — skipping ambient/proactive loop on this instance.")
+        return
+
+    scheduler.add_job(run_proactive_check, "interval", minutes=5, id="ambient_proactive_check")
+    scheduler.start()
+    logger.info("Ambient/proactive loop started (checking every 5 minutes).")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Start the Telegram bot in a daemon thread so it runs alongside FastAPI
     bot_thread = threading.Thread(target=_start_telegram_bot, daemon=True, name="telegram-bot")
     bot_thread.start()
+
+    from apscheduler.schedulers.background import BackgroundScheduler
+    scheduler = BackgroundScheduler()
+    _start_ambient_loop(scheduler)
+
     yield
     # Daemon thread stops automatically when the main process exits
+    if scheduler.running:
+        scheduler.shutdown(wait=False)
 
 
 app = FastAPI(title="Jarvis AI", lifespan=lifespan)

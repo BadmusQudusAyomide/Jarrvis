@@ -10,6 +10,35 @@ logger = logging.getLogger(__name__)
 MAX_STEPS = 8
 MAX_TOOL_CALLS = 8
 
+# Deliberately tiny and exact-match only — this is NOT a growing pile of
+# regex patterns trying to catch every casual phrasing (that's the mistake
+# the old 11-parser fallback system made). Anything not a literal match here
+# falls through to the model; when in doubt, call the LLM, don't guess.
+_SMALLTALK_RESPONSES = {
+    "hi": "Hello! How can I help you today?",
+    "hello": "Hello! How can I help you today?",
+    "hey": "Hey! What can I do for you?",
+    "yo": "Hey! What can I do for you?",
+    "how are you": "I'm doing well, thanks for asking! How can I help you today?",
+    "how are you doing": "I'm doing well, thanks for asking! How can I help you today?",
+    "how's it going": "I'm doing well, thanks for asking! How can I help you today?",
+    "thanks": "You're welcome!",
+    "thank you": "You're welcome!",
+    "thanks jarvis": "You're welcome!",
+    "bye": "Goodbye! Talk soon.",
+    "goodbye": "Goodbye! Talk soon.",
+    "see you": "Goodbye! Talk soon.",
+}
+
+
+def _match_smalltalk(text: str) -> str | None:
+    """Exact-match against a short allowlist only. No fuzzy matching, no
+    substring/contains checks — a message that isn't a verbatim hit falls
+    through to the model rather than risk misfiring on something that
+    wasn't actually smalltalk."""
+    normalized = text.strip().lower().rstrip("!.?")
+    return _SMALLTALK_RESPONSES.get(normalized)
+
 
 class Agent:
     def __init__(self, model: str = None):
@@ -57,6 +86,12 @@ class Agent:
             self.tool_calls = 0
             self.observations = []
             self.last_tool_error = None
+
+            smalltalk_reply = _match_smalltalk(user_message)
+            if smalltalk_reply is not None:
+                logger.info(f"[AGENT] Smalltalk fast-path matched ({user_message!r}) — skipped LLM call")
+                return smalltalk_reply
+
             self._tool_schemas = get_tool_schemas(get_relevant_tool_names(user_message))
             logger.info(f"[AGENT] Scoped to {len(self._tool_schemas)} tool schemas for this request")
 

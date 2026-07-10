@@ -19,3 +19,4 @@ google-auth-oauthlib
 gitpython
 python-multipart
 openwakeword
+apscheduler
