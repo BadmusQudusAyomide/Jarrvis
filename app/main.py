@@ -12,6 +12,8 @@ from app.utils.logging_config import setup_logging
 from app.api.chat import router as chat_router
 from app.api.tasks import router as tasks_router
 from app.api.system import router as system_router
+from app.api.whatsapp import router as whatsapp_router
+from app.api.voice import router as voice_router
 
 # Windows async event loop policy for Playwright
 if sys.platform == "windows":
@@ -28,6 +30,10 @@ def _start_telegram_bot() -> None:
     Uses the async context manager instead of run_polling() so signal handlers
     are never registered — required when running outside the main thread.
     """
+    if os.getenv("DISABLE_TELEGRAM_BOT", "false").strip().lower() == "true":
+        logger.info("DISABLE_TELEGRAM_BOT is set — skipping local Telegram polling (avoids conflicting with the deployed instance).")
+        return
+
     token = os.getenv("TELEGRAM_BOT_TOKEN", "")
     if not token or token == "your_telegram_bot_token_here":
         logger.warning("TELEGRAM_BOT_TOKEN not set — Telegram bot will not start.")
@@ -79,6 +85,8 @@ app.add_middleware(
 app.include_router(chat_router)
 app.include_router(tasks_router)
 app.include_router(system_router)
+app.include_router(whatsapp_router)
+app.include_router(voice_router)
 
 # Check if frontend build exists
 frontend_build_path = os.path.join(os.path.dirname(__file__), "..", "static", "frontend")

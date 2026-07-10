@@ -164,7 +164,7 @@ def chat(req: ChatRequest):
             )
             add_message(req.session_id, "user", req.message)
             add_message(req.session_id, "assistant", response_text)
-            return {"response": response_text}
+            return {"response": response_text, "requires_confirmation": True}
         set_profile_name(req.session_id, extracted_name)
         # Fast path: if this is a direct name declaration, do not run agent/LLM.
         if re.match(r"^\s*(my name is|i am|i'm)\s+.+$", normalized_msg, re.IGNORECASE):
@@ -255,12 +255,15 @@ def chat(req: ChatRequest):
     
     # 9. Add final response to history
     add_message(req.session_id, "assistant", response_text)
-    
+
     # 10. Store in long-term memory if worth remembering
     if is_worth_remembering(req.message):
         store_memory(req.session_id, req.message)
-    
-    return {"response": response_text}
+
+    # A destructive-tool confirmation may have been raised during agent.run() —
+    # surface it as a flag so the UI can render it distinctly from a normal answer.
+    requires_confirmation = get_pending_action(req.session_id) is not None
+    return {"response": response_text, "requires_confirmation": requires_confirmation}
 
 
 @router.post("/chat/stream")

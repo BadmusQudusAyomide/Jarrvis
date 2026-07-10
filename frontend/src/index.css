@@ -33,6 +33,11 @@
   --ai-bg: rgba(8, 16, 32, 0.75);
   --ai-border: rgba(0, 212, 255, 0.12);
 
+  --warn: #ffb020;
+  --warn-bg: rgba(255, 176, 32, 0.1);
+  --warn-border: rgba(255, 176, 32, 0.4);
+  --danger: #ff4d5e;
+
   --sidebar-w: 260px;
   --topbar-h: 52px;
 }
@@ -359,6 +364,8 @@ body {
 }
 
 .settings-btn:hover { background: var(--bg-glass); color: var(--text-secondary); }
+.settings-btn:disabled { cursor: not-allowed; opacity: 0.5; }
+.settings-btn:disabled:hover { background: transparent; color: var(--text-muted); }
 
 /* ── Main ─────────────────────────────────────────── */
 .main {
@@ -367,6 +374,7 @@ body {
   flex-direction: column;
   min-width: 0;
   height: 100vh;
+  position: relative;
 }
 
 /* ── Topbar ─────────────────────────────────────── */
@@ -550,6 +558,59 @@ body {
   text-align: right;
 }
 
+.bubble-confirm {
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-border);
+  box-shadow: 0 0 16px rgba(255, 176, 32, 0.08);
+}
+
+.bubble-confirm .bubble-sender {
+  color: var(--warn);
+}
+
+.bubble-confirm-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.confirm-btn {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.confirm-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.confirm-yes {
+  background: rgba(255, 176, 32, 0.18);
+  border: 1px solid var(--warn-border);
+  color: var(--warn);
+}
+
+.confirm-yes:not(:disabled):hover {
+  background: rgba(255, 176, 32, 0.28);
+}
+
+.confirm-no {
+  background: rgba(255, 77, 94, 0.12);
+  border: 1px solid rgba(255, 77, 94, 0.35);
+  color: var(--danger);
+}
+
+.confirm-no:not(:disabled):hover {
+  background: rgba(255, 77, 94, 0.2);
+}
+
 .bubble-content {
   font-size: 14px;
   line-height: 1.65;
@@ -652,6 +713,195 @@ body {
 
 .send-btn:hover:not(:disabled) { background: rgba(0,212,255,0.25); }
 .send-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.mic-btn {
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  border-left: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  flex-shrink: 0;
+}
+
+.mic-btn:hover:not(:disabled) { background: var(--bg-glass); color: var(--cyan); }
+.mic-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.mic-btn-active {
+  color: var(--danger);
+  background: rgba(255, 77, 94, 0.12);
+  animation: mic-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes mic-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 77, 94, 0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(255, 77, 94, 0); }
+}
+
+/* ── Voice: speaker toggle, hero orb, error toast ──────────── */
+.speak-toggle-btn {
+  padding: 7px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+}
+
+.speak-toggle-btn:hover { background: var(--bg-glass); border-color: var(--border); }
+.speak-toggle-on { color: var(--cyan); }
+
+.voice-orb-canvas {
+  filter: drop-shadow(0 0 12px rgba(0, 180, 255, 0.15));
+}
+
+.voice-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  flex-shrink: 0;
+  position: relative;
+  transition: padding 0.25s ease;
+}
+
+.voice-hero-compact {
+  padding: 22px 0 10px;
+}
+
+.voice-hero-full {
+  flex: 1;
+  padding: 20px 0;
+}
+
+.voice-hero-orb-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  border-radius: 50%;
+  transition: transform 0.15s ease;
+}
+
+.voice-hero-orb-btn:hover:not(:disabled) { transform: scale(1.03); }
+.voice-hero-orb-btn:disabled { cursor: not-allowed; opacity: 0.7; }
+
+.voice-hero-status {
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 3px;
+  color: var(--cyan);
+  text-shadow: 0 0 8px rgba(0, 212, 255, 0.6);
+}
+
+.voice-error-toast {
+  background: rgba(255, 77, 94, 0.12);
+  border: 1px solid rgba(255, 77, 94, 0.35);
+  color: var(--danger);
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  max-width: 80%;
+  text-align: center;
+}
+
+.messages-area-hidden {
+  display: none;
+}
+
+/* ── Settings panel ─────────────────────────────────────────── */
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 14, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-panel {
+  width: 360px;
+  max-width: 90vw;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-bright);
+  border-radius: 10px;
+  padding: 18px;
+  box-shadow: 0 0 40px rgba(0, 180, 255, 0.15);
+}
+
+.settings-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700;
+  letter-spacing: 2px;
+  font-size: 12px;
+  color: var(--cyan);
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.settings-close-btn:hover { color: var(--text-primary); }
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  cursor: pointer;
+}
+
+.settings-row + .settings-row { border-top: 1px solid var(--border); }
+
+.settings-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-row-title {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.settings-row-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.settings-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--cyan);
+  cursor: pointer;
+  flex-shrink: 0;
+}
 
 .spinner {
   width: 16px; height: 16px;

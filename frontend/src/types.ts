@@ -4,6 +4,7 @@ export interface Message {
   content: string
   timestamp: Date
   isStreaming?: boolean
+  requiresConfirmation?: boolean
 }
 
 export interface ChatState {
@@ -19,10 +20,17 @@ export interface ChatRequest {
 
 export interface ChatResponse {
   response: string
+  requires_confirmation?: boolean
 }
 
 export interface StreamToken {
   token?: string
   error?: string
   done?: boolean
+}
+
+export interface SystemStatsResponse {
+  cpu_usage?: string
+  ram_usage?: string
+  model?: string
 }

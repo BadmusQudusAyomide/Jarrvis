@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect } from 'react'
-import { Send, Menu, Plus, MessageSquare, Cpu, Settings, Zap, Activity, HardDrive, Terminal } from 'lucide-react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { Send, Menu, Plus, MessageSquare, Cpu, Settings, Zap, Activity, HardDrive, Terminal, Mic, Square, Volume2, VolumeX } from 'lucide-react'
 import { Message } from './types'
-import { sendMessage } from './api'
+import { sendMessage, clearSession, getSystemStats, transcribeAudio, synthesizeSpeech } from './api'
+import VoiceOrb, { VoiceState } from './VoiceOrb'
 
 interface SystemStats {
   cpu: number
@@ -10,7 +11,26 @@ interface SystemStats {
   status: 'online' | 'thinking' | 'offline'
 }
 
+const SESSION_STORAGE_KEY = 'jarvis_session_id'
+const SHOW_TRANSCRIPT_KEY = 'jarvis_show_transcript'
+const GREETING = 'JARVIS online. All systems operational. How can I assist you today?'
+
+function getOrCreateSessionId(): string {
+  let id = localStorage.getItem(SESSION_STORAGE_KEY)
+  if (!id) {
+    id = `web_${crypto.randomUUID()}`
+    localStorage.setItem(SESSION_STORAGE_KEY, id)
+  }
+  return id
+}
+
+function getStoredShowTranscript(): boolean {
+  const saved = localStorage.getItem(SHOW_TRANSCRIPT_KEY)
+  return saved === null ? true : saved === 'true'
+}
+
 function App() {
+  const [sessionId] = useState<string>(getOrCreateSessionId)
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'welcome',
@@ -25,16 +45,55 @@ function App() {
   const [stats, setStats] = useState<SystemStats>({
     cpu: 0,
     ram: 0,
-    model: 'llama3.1:8b',
+    model: '—',
     status: 'online',
   })
   const [time, setTime] = useState(new Date())
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
+  // --- Voice: mic input, TTS playback, and the live audio-reactive orb ---
+  const [voiceState, setVoiceState] = useState<VoiceState>('idle')
+  const [isTranscribing, setIsTranscribing] = useState(false)
+  const [autoSpeak, setAutoSpeak] = useState(true)
+  const [voiceAnalyser, setVoiceAnalyser] = useState<AnalyserNode | null>(null)
+  const [voiceError, setVoiceError] = useState<string | null>(null)
+  const [showTranscript, setShowTranscript] = useState<boolean>(getStoredShowTranscript)
+  const [showSettings, setShowSettings] = useState(false)
+
+  const audioCtxRef = useRef<AudioContext | null>(null)
+  const micStreamRef = useRef<MediaStream | null>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
+  const playbackAudioRef = useRef<HTMLAudioElement | null>(null)
+  const vadRafRef = useRef<number>()
+  const hasSpokenRef = useRef(false)
+  const silenceStartRef = useRef<number | null>(null)
+  const recordingStartRef = useRef(0)
+
+  const getAudioCtx = useCallback(() => {
+    if (!audioCtxRef.current) {
+      audioCtxRef.current = new AudioContext()
+    }
+    return audioCtxRef.current
+  }, [])
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  useEffect(() => {
+    localStorage.setItem(SHOW_TRANSCRIPT_KEY, String(showTranscript))
+  }, [showTranscript])
+
+  // Greet once when the app opens
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (autoSpeak) speak(GREETING)
+    }, 500)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000)
@@ -44,35 +103,203 @@ function App() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const res = await fetch('http://localhost:8000/system/stats')
-        if (res.ok) {
-          const data = await res.json()
-          setStats(prev => ({
-            ...prev,
-            cpu: data.cpu_usage ? parseFloat(data.cpu_usage) : prev.cpu,
-            ram: data.ram_usage ? parseFloat(data.ram_usage) : prev.ram,
-          }))
-        }
-      } catch {}
+        const data = await getSystemStats()
+        setStats(prev => ({
+          ...prev,
+          cpu: data.cpu_usage ? parseFloat(data.cpu_usage) : prev.cpu,
+          ram: data.ram_usage ? parseFloat(data.ram_usage) : prev.ram,
+          model: data.model || prev.model,
+        }))
+      } catch {
+        setStats(prev => ({ ...prev, status: 'offline' }))
+      }
     }
     fetchStats()
     const interval = setInterval(fetchStats, 5000)
     return () => clearInterval(interval)
   }, [])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!input.trim() || isLoading) return
+  const speak = async (text: string) => {
+    if (!text.trim()) return
+    try {
+      setVoiceError(null)
+      const blob = await synthesizeSpeech(text)
+      const url = URL.createObjectURL(blob)
+
+      // Stop anything already playing before starting the new clip
+      if (playbackAudioRef.current) {
+        playbackAudioRef.current.pause()
+      }
+
+      const audio = new Audio(url)
+      playbackAudioRef.current = audio
+
+      const ctx = getAudioCtx()
+      const source = ctx.createMediaElementSource(audio)
+      const analyser = ctx.createAnalyser()
+      analyser.fftSize = 128
+      source.connect(analyser)
+      analyser.connect(ctx.destination)
+      setVoiceAnalyser(analyser)
+      setVoiceState('speaking')
+
+      audio.onended = () => {
+        setVoiceState('idle')
+        setVoiceAnalyser(null)
+        URL.revokeObjectURL(url)
+      }
+      audio.onerror = () => {
+        setVoiceState('idle')
+        setVoiceAnalyser(null)
+        URL.revokeObjectURL(url)
+      }
+      await audio.play()
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err)
+      setVoiceError(`Couldn't speak reply: ${detail}`)
+      setVoiceState('idle')
+    }
+  }
+
+  // Voice activity detection tuning — RMS is measured on a 0-127 scale
+  // (deviation from the 128 silence midpoint in time-domain byte data).
+  const SPEECH_RMS_THRESHOLD = 8      // above this = you're actively talking
+  const SILENCE_RMS_THRESHOLD = 5     // below this = quiet (has hysteresis vs the speech threshold)
+  const SILENCE_STOP_MS = 1300        // stop after this long of quiet following speech
+  const MAX_INITIAL_SILENCE_MS = 6000 // give up if nothing was said at all
+  const MAX_RECORDING_MS = 25000      // hard cap regardless of VAD
+
+  const stopVadLoop = () => {
+    if (vadRafRef.current) {
+      cancelAnimationFrame(vadRafRef.current)
+      vadRafRef.current = undefined
+    }
+  }
+
+  const startRecording = async () => {
+    try {
+      setVoiceError(null)
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      micStreamRef.current = stream
+
+      const ctx = getAudioCtx()
+      const source = ctx.createMediaStreamSource(stream)
+      const analyser = ctx.createAnalyser()
+      analyser.fftSize = 2048
+      source.connect(analyser)
+      setVoiceAnalyser(analyser)
+      setVoiceState('listening')
+
+      audioChunksRef.current = []
+      hasSpokenRef.current = false
+      silenceStartRef.current = null
+      recordingStartRef.current = Date.now()
+
+      const recorder = new MediaRecorder(stream)
+      recorder.ondataavailable = e => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data)
+      }
+      recorder.start()
+      mediaRecorderRef.current = recorder
+
+      // Watch mic volume every frame; auto-stop once you've spoken and gone quiet.
+      const timeDomain = new Uint8Array(analyser.fftSize)
+      const monitor = () => {
+        analyser.getByteTimeDomainData(timeDomain)
+        let sumSquares = 0
+        for (let i = 0; i < timeDomain.length; i++) {
+          const deviation = timeDomain[i] - 128
+          sumSquares += deviation * deviation
+        }
+        const rms = Math.sqrt(sumSquares / timeDomain.length)
+        const elapsed = Date.now() - recordingStartRef.current
+
+        if (rms > SPEECH_RMS_THRESHOLD) {
+          hasSpokenRef.current = true
+          silenceStartRef.current = null
+        } else if (rms < SILENCE_RMS_THRESHOLD && hasSpokenRef.current) {
+          if (silenceStartRef.current === null) silenceStartRef.current = Date.now()
+          if (Date.now() - silenceStartRef.current > SILENCE_STOP_MS) {
+            stopRecording()
+            return
+          }
+        }
+
+        if (!hasSpokenRef.current && elapsed > MAX_INITIAL_SILENCE_MS) {
+          stopRecording()
+          return
+        }
+        if (elapsed > MAX_RECORDING_MS) {
+          stopRecording()
+          return
+        }
+
+        vadRafRef.current = requestAnimationFrame(monitor)
+      }
+      vadRafRef.current = requestAnimationFrame(monitor)
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err)
+      setVoiceError(`Couldn't access microphone: ${detail}`)
+      setVoiceState('idle')
+    }
+  }
+
+  const stopRecording = () => {
+    const recorder = mediaRecorderRef.current
+    if (!recorder) return
+
+    stopVadLoop()
+    const spoke = hasSpokenRef.current
+
+    recorder.onstop = async () => {
+      micStreamRef.current?.getTracks().forEach(t => t.stop())
+      micStreamRef.current = null
+      setVoiceAnalyser(null)
+      setVoiceState('idle')
+
+      const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+      audioChunksRef.current = []
+
+      // Nothing but silence/noise was captured — don't send it to Whisper,
+      // which reliably hallucinates plausible-sounding text on empty audio.
+      if (blob.size === 0 || !spoke) return
+
+      setIsTranscribing(true)
+      try {
+        const text = await transcribeAudio(blob)
+        if (text.trim()) {
+          await sendUserMessage(text)
+        }
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : String(err)
+        setVoiceError(`Transcription failed: ${detail}`)
+      } finally {
+        setIsTranscribing(false)
+      }
+    }
+    recorder.stop()
+    mediaRecorderRef.current = null
+  }
+
+  const toggleRecording = () => {
+    if (voiceState === 'listening') {
+      stopRecording()
+    } else if (voiceState === 'idle' && !isLoading) {
+      startRecording()
+    }
+  }
+
+  const sendUserMessage = async (text: string) => {
+    if (!text.trim() || isLoading) return
 
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
-      content: input.trim(),
+      content: text.trim(),
       timestamp: new Date(),
     }
 
     setMessages(prev => [...prev, userMessage])
-    setInput('')
     setIsLoading(true)
     setStats(prev => ({ ...prev, status: 'thinking' }))
 
@@ -86,19 +313,23 @@ function App() {
     setMessages(prev => [...prev, assistantMessage])
 
     try {
-      const fullResponse = await sendMessage(userMessage.content, 'web-session')
+      const result = await sendMessage(userMessage.content, sessionId)
       setMessages(prev =>
         prev.map(msg =>
           msg.id === assistantMessage.id
-            ? { ...msg, content: fullResponse, isStreaming: false }
+            ? { ...msg, content: result.response, isStreaming: false, requiresConfirmation: result.requires_confirmation }
             : msg
         )
       )
-    } catch {
+      if (autoSpeak) {
+        speak(result.response)
+      }
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err)
       setMessages(prev =>
         prev.map(msg =>
           msg.id === assistantMessage.id
-            ? { ...msg, content: 'Connection error. Please retry.', isStreaming: false }
+            ? { ...msg, content: `Connection error: ${detail}`, isStreaming: false }
             : msg
         )
       )
@@ -108,6 +339,13 @@ function App() {
     }
   }
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const text = input
+    setInput('')
+    await sendUserMessage(text)
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -115,15 +353,29 @@ function App() {
     }
   }
 
-  const clearChat = () => {
-    setMessages([
-      {
-        id: 'welcome',
-        role: 'assistant',
-        content: 'Session cleared. JARVIS ready.',
-        timestamp: new Date(),
-      },
-    ])
+  const clearChat = async () => {
+    try {
+      await clearSession(sessionId)
+      setMessages([
+        {
+          id: 'welcome',
+          role: 'assistant',
+          content: 'Session cleared. JARVIS ready.',
+          timestamp: new Date(),
+        },
+      ])
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err)
+      setMessages(prev => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: `Couldn't clear the session: ${detail}`,
+          timestamp: new Date(),
+        },
+      ])
+    }
   }
 
   const formatTime = (date: Date) =>
@@ -226,12 +478,47 @@ function App() {
           </div>
 
           <div className="sidebar-footer">
-            <button className="settings-btn">
+            <button className="settings-btn" onClick={() => setShowSettings(true)}>
               <Settings size={15} />
               <span>Settings</span>
             </button>
           </div>
         </aside>
+
+        {showSettings && (
+          <div className="settings-overlay" onClick={() => setShowSettings(false)}>
+            <div className="settings-panel" onClick={e => e.stopPropagation()}>
+              <div className="settings-panel-header">
+                <span>SETTINGS</span>
+                <button className="settings-close-btn" onClick={() => setShowSettings(false)}>×</button>
+              </div>
+
+              <label className="settings-row">
+                <div className="settings-row-text">
+                  <span className="settings-row-title">Show transcript</span>
+                  <span className="settings-row-desc">Keep a scrolling text log visible below the voice orb</span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={showTranscript}
+                  onChange={e => setShowTranscript(e.target.checked)}
+                />
+              </label>
+
+              <label className="settings-row">
+                <div className="settings-row-text">
+                  <span className="settings-row-title">Speak replies aloud</span>
+                  <span className="settings-row-desc">Jarvis reads its responses out loud as it replies</span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={autoSpeak}
+                  onChange={e => setAutoSpeak(e.target.checked)}
+                />
+              </label>
+            </div>
+          </div>
+        )}
 
         {/* Main area */}
         <main className="main">
@@ -247,14 +534,49 @@ function App() {
               <span className="topbar-sub">Personal AI Agent</span>
             </div>
 
+            <button
+              className={`speak-toggle-btn ${autoSpeak ? 'speak-toggle-on' : ''}`}
+              onClick={() => setAutoSpeak(v => !v)}
+              title={autoSpeak ? 'Voice replies on — click to mute' : 'Voice replies off — click to unmute'}
+            >
+              {autoSpeak ? <Volume2 size={16} /> : <VolumeX size={16} />}
+            </button>
+
             <div className="topbar-clock">
               <span className="clock-time">{formatTime(time)}</span>
               <span className="clock-date">{formatDate(time)}</span>
             </div>
           </header>
 
-          {/* Messages */}
-          <div className="messages-area">
+          {/* Voice hero — the main event */}
+          <div className={`voice-hero ${showTranscript ? 'voice-hero-compact' : 'voice-hero-full'}`}>
+            <button
+              type="button"
+              className="voice-hero-orb-btn"
+              onClick={toggleRecording}
+              disabled={(isLoading && voiceState !== 'listening') || isTranscribing || voiceState === 'speaking'}
+              title={voiceState === 'listening' ? 'Stop recording' : 'Tap to speak to Jarvis'}
+            >
+              <VoiceOrb analyser={voiceAnalyser} state={voiceState} size={showTranscript ? 180 : 280} />
+            </button>
+            <div className="voice-hero-status">
+              {voiceState === 'listening'
+                ? 'LISTENING…'
+                : voiceState === 'speaking'
+                ? 'SPEAKING…'
+                : isTranscribing
+                ? 'TRANSCRIBING…'
+                : 'TAP THE ORB TO SPEAK'}
+            </div>
+            {voiceError && (
+              <div className="voice-error-toast" onClick={() => setVoiceError(null)}>
+                {voiceError}
+              </div>
+            )}
+          </div>
+
+          {/* Messages / transcript */}
+          <div className={`messages-area ${showTranscript ? '' : 'messages-area-hidden'}`}>
             <div className="messages-inner">
               {messages.map(message => (
                 <div
@@ -267,10 +589,16 @@ function App() {
                     </div>
                   )}
 
-                  <div className={`bubble ${message.role === 'user' ? 'bubble-user' : 'bubble-ai'}`}>
+                  <div
+                    className={`bubble ${message.role === 'user' ? 'bubble-user' : 'bubble-ai'} ${
+                      message.requiresConfirmation ? 'bubble-confirm' : ''
+                    }`}
+                  >
                     {message.role === 'assistant' && (
                       <div className="bubble-header">
-                        <span className="bubble-sender">JARVIS</span>
+                        <span className="bubble-sender">
+                          {message.requiresConfirmation ? 'JARVIS · CONFIRMATION NEEDED' : 'JARVIS'}
+                        </span>
                         <span className="bubble-time">{formatMsgTime(message.timestamp)}</span>
                       </div>
                     )}
@@ -278,6 +606,26 @@ function App() {
                       {message.content || (message.isStreaming && <span className="thinking-text">Processing...</span>)}
                       {message.isStreaming && <span className="cursor-blink" />}
                     </div>
+                    {message.requiresConfirmation && !message.isStreaming && (
+                      <div className="bubble-confirm-actions">
+                        <button
+                          type="button"
+                          className="confirm-btn confirm-yes"
+                          disabled={isLoading}
+                          onClick={() => sendUserMessage('yes')}
+                        >
+                          Yes, proceed
+                        </button>
+                        <button
+                          type="button"
+                          className="confirm-btn confirm-no"
+                          disabled={isLoading}
+                          onClick={() => sendUserMessage('no')}
+                        >
+                          No, cancel
+                        </button>
+                      </div>
+                    )}
                     {message.role === 'user' && (
                       <div className="bubble-footer-user">
                         <span className="bubble-time">{formatMsgTime(message.timestamp)}</span>
@@ -310,6 +658,15 @@ function App() {
                   disabled={isLoading}
                 />
                 <button
+                  type="button"
+                  onClick={toggleRecording}
+                  disabled={(isLoading && voiceState !== 'listening') || isTranscribing || voiceState === 'speaking'}
+                  className={`mic-btn ${voiceState === 'listening' ? 'mic-btn-active' : ''}`}
+                  title={voiceState === 'listening' ? 'Stop recording' : 'Speak to Jarvis'}
+                >
+                  {voiceState === 'listening' ? <Square size={15} /> : <Mic size={16} />}
+                </button>
+                <button
                   type="submit"
                   disabled={!input.trim() || isLoading}
                   className="send-btn"
@@ -321,7 +678,7 @@ function App() {
                   )}
                 </button>
               </div>
-              <div className="input-hint">Enter to send · Shift+Enter for new line</div>
+              <div className="input-hint">Enter to send · Shift+Enter for new line · Mic to talk</div>
             </form>
           </div>
         </main>

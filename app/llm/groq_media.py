@@ -12,6 +12,8 @@ logger = logging.getLogger(__name__)
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
 GROQ_WHISPER_MODEL = os.getenv("GROQ_WHISPER_MODEL", "whisper-large-v3")
 GROQ_VISION_MODEL = os.getenv("GROQ_VISION_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct")
+GROQ_TTS_MODEL = os.getenv("GROQ_TTS_MODEL", "canopylabs/orpheus-v1-english")
+GROQ_TTS_VOICE = os.getenv("GROQ_TTS_VOICE", "austin")
 
 
 def transcribe_audio(audio_path: str) -> str:
@@ -36,6 +38,31 @@ def transcribe_audio(audio_path: str) -> str:
     except Exception as e:
         logger.error(f"transcribe_audio error: {e}")
         return f"Transcription error: {e}"
+
+
+def synthesize_speech(text: str, voice: str = None) -> bytes:
+    """Convert text to speech via Groq's Orpheus TTS. Returns raw WAV audio bytes,
+    or raises RuntimeError with a Groq-provided reason on failure."""
+    if not GROQ_API_KEY:
+        raise RuntimeError("GROQ_API_KEY not set — cannot synthesize speech.")
+    if not text or not text.strip():
+        raise RuntimeError("No text to speak.")
+
+    url = "https://api.groq.com/openai/v1/audio/speech"
+    headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
+    payload = {
+        "model": GROQ_TTS_MODEL,
+        "input": text[:4096],  # keep requests bounded; long replies get truncated for speech
+        "voice": voice or GROQ_TTS_VOICE,
+        "response_format": "wav",
+    }
+
+    resp = requests.post(url, headers=headers, json=payload, timeout=30)
+    if resp.status_code != 200:
+        logger.error(f"TTS API {resp.status_code}: {resp.text[:300]}")
+        raise RuntimeError(f"Speech synthesis failed (HTTP {resp.status_code}): {resp.text[:200]}")
+
+    return resp.content
 
 
 def analyze_image(image_path: str, prompt: str = "Describe this image in detail. What do you see?") -> str:

@@ -2,6 +2,8 @@
 from fastapi import APIRouter
 import psutil
 
+from app.config import DEFAULT_MODEL
+
 router = APIRouter()
 
 
@@ -12,5 +14,6 @@ async def system_stats():
     ram = psutil.virtual_memory()
     return {
         "cpu_usage": f"{cpu}",
-        "ram_usage": f"{ram.percent}"
+        "ram_usage": f"{ram.percent}",
+        "model": DEFAULT_MODEL,
     }
