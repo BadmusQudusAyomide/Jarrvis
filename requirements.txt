@@ -20,3 +20,5 @@ gitpython
 python-multipart
 openwakeword
 apscheduler
+mcp
+scapy

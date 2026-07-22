@@ -8,6 +8,8 @@ class ToolParameter(BaseModel):
     type: str
     description: str
     required: bool = True
+    items_type: Optional[str] = None
+    """For type='list'/'array' params: the JSON schema type of each item (e.g. 'integer')."""
 
 class ToolSchema(BaseModel):
     """Structured schema for a tool."""

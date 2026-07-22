@@ -28,6 +28,7 @@ from app.tools.twitter_tools import (
     GetUserTweetsTool, DeleteTweetTool
 )
 from app.tools.media_tools import DownloadMediaTool
+from app.tools.network_tools import NetworkDiscoverTool, OsFingerprintTool, PortScanTool
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -138,7 +139,10 @@ TOOLS = {
     "search_tweets": SearchTweetsTool(),
     "get_user_tweets": GetUserTweetsTool(),
     "delete_tweet": DeleteTweetTool(),
-    "download_media": DownloadMediaTool()
+    "download_media": DownloadMediaTool(),
+    "network_discover": NetworkDiscoverTool(),
+    "port_scan": PortScanTool(),
+    "os_fingerprint": OsFingerprintTool()
 }
 
 # Tool categories for context-scoped schema selection — sending all 58 tool
@@ -160,6 +164,7 @@ TOOL_CATEGORIES: dict[str, list[str]] = {
     "twitter": ["post_tweet", "get_home_timeline", "search_tweets", "get_user_tweets", "delete_tweet"],
     "process": ["list_processes", "kill_process", "launch_app", "is_process_running"],
     "media": ["download_media"],
+    "network": ["network_discover", "port_scan", "os_fingerprint"],
 }
 
 _CATEGORY_TRIGGERS: dict[str, list[str]] = {
@@ -178,6 +183,11 @@ _CATEGORY_TRIGGERS: dict[str, list[str]] = {
     "twitter": ["tweet", "twitter", "x.com", "timeline"],
     "process": ["process", "launch app", "open app", "kill ", "running app", "task manager"],
     "media": ["download", "youtube", "tiktok", "instagram video"],
+    "network": ["network", "wifi", "wi-fi", "connected devices", "my router",
+                 "local network", "ip address", "mac address", "who's on my network",
+                 "devices on my network", "port scan", "scan ports", "open ports",
+                 "what os", "operating system", "fingerprint", "is running windows",
+                 "is running linux"],
 }
 
 # Fallback when no category-specific keyword matches — the most generally
@@ -232,10 +242,14 @@ def get_tool_schemas(tool_names: list[str] = None) -> list[dict]:
         properties = {}
         required = []
         for p in schema.parameters:
-            properties[p.name] = {
-                "type": _JSON_SCHEMA_TYPES.get(p.type, p.type),
+            json_type = _JSON_SCHEMA_TYPES.get(p.type, p.type)
+            prop = {
+                "type": json_type,
                 "description": p.description,
             }
+            if json_type == "array":
+                prop["items"] = {"type": p.items_type or "string"}
+            properties[p.name] = prop
             if p.required:
                 required.append(p.name)
 
